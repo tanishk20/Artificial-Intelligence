@@ -1,0 +1,130 @@
+import pandas as pd
+import matplotlib as plt
+import sklearn
+import numpy as np
+import seaborn as snb
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix 
+from sklearn.metrics import accuracy_score 
+from sklearn.metrics import classification_report 
+
+data =pd.read_csv('StudentsPerformance.csv')
+data
+
+data.sample(10)
+# """" Based on the sample, What I understood was,
+
+# data frame consists of 8 columns
+# I would like to rename columns for better understanding and accessing.
+
+data.columns = ['gender', 'race', 'parentDegree', 'lunch', 'course', 'mathScore', 'readingScore', 'writingScore'] 
+
+data.isna().sum()
+data['total'] = (data['mathScore']+data['readingScore']+data['writingScore'])/3
+data.sample(10)
+
+#Let's start analyzing from now.
+
+#How Race/Group and Parent Degree is related to total scores??
+
+data.groupby(['race','parentDegree']).mean()
+
+#Insight 1: As we see, High school, some High school of parentDegree has less scores.... 
+#Insight 2: Aso, As group Name is increasing, scores are increasing. Group A < Group B < Group C < Group D < Group E.
+
+data.groupby(['gender']).mean()
+#relation between gender and course and total
+course_gender = data.groupby(['gender','course']).mean().reset_index()
+
+snb.catplot(x='gender', y='total', hue='course', data=course_gender, kind='bar')
+
+#Now we can observe that,Parents degree is also crucial in student's score. 
+course_gender = data.groupby(['gender','parentDegree']).mean().reset_index()
+snb.catplot(x='gender', y='total', hue='parentDegree', data=course_gender, kind='bar')
+
+# So, I would like to generalize "parentDegree" column, with 'has_degree' and 'no_degree'.
+# if parent Degree is in ("high school","some high school") then, I thought they don't have degree. or else they has degree
+
+data.parentDegree.unique()
+for i in range(len(data)):
+    if data.iloc[i,2] in ['high school', 'some high school']:
+        data.iloc[i,2] = 'No_Degree'
+    else:
+        data.iloc[i,2] = 'has_Degree'
+
+data.sample(5)
+#Even Lunch affects student's scores
+
+Lunch_course = data.groupby(['lunch','course']).mean().reset_index()
+snb.catplot(x='lunch', y='total', hue='course', data=Lunch_course, kind='bar')
+
+data.parentDegree.value_counts()
+
+#Now we can observe that,Parents degree is also crucial in student's score. 
+course_gender = data.groupby(['gender','parentDegree']).mean().reset_index()
+snb.catplot(x='gender', y='total', hue='parentDegree', data=course_gender, kind='bar')
+
+race_gender = data.groupby(['gender','race']).mean().reset_index()
+snb.catplot(x='gender', y='total', hue='race', data=race_gender, kind='bar')
+
+final_data = data.groupby(['gender','parentDegree','course','lunch','race']).mean().reset_index()
+final_data
+
+after_sort = final_data.sort_values(by= ['total'],ascending = False)
+after_sort.drop(columns=['mathScore','readingScore','writingScore'],inplace = True)
+after_sort
+
+# As you can see above, I have generalized all features
+
+# As you can see, Top students(mean) have completed their course, Took standard Lunch, Having parent_Degree is also + point.
+# Bottom students(mean) didn't complete course, Didn't take good lunch, parent has no degree.
+# Out of Top 10(mean), 7 are female students
+# Interestingly, Out of Bottom 10(mean), 7 are male students
+
+#See, it's clear
+print("Top students Performance \n",after_sort[:10])
+#Simply, if you complete course, Have standard lunch, you   can score good grade
+
+#See, it's clear
+print("Bottom students Performance \n",after_sort[-10:][::-1])
+#Simply, Lunch, Course are mandatory for scoring good. 
+
+base = pd.get_dummies(final_data,columns=['gender','race','parentDegree','course','lunch'],dtype = int)
+base
+
+base.info()
+
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+from xgboost import XGBRegressor
+
+x = base.iloc[:, 4:].values 
+print(x) 
+
+y = base.iloc[:, 3].values 
+print(y) 
+
+train_x,test_x,train_y,test_y = train_test_split(base.iloc[:,4:],base.iloc[:,3],test_size = 0.2)
+yy=np.asarray(test_y)
+model = XGBRegressor(max_depth = 6)
+model.fit(train_x,train_y)
+target = model.predict(test_x)
+print(target)
+
+mean_squared_error(target,test_y)
+test_y[:12]
+
+target[:12]
+yyy=np.asarray(target)
+print(yyy)
+
+# Finally, What I observed is ,
+
+# Students percentage is correlated with Groups Average Percentage.
+#      ex: Average student from Group E have scored more compared to Group A's average Student.
+# Parents Degree is also a bit correlated.
+# Female Students Percentage is higher than Male Students.
+# Students Who took courses have benefitted.
+# Students who took standard lunch has scored well.
